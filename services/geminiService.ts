@@ -6,205 +6,131 @@ const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const callWithRetry = async (params: GenerateContentParameters, retries = 3, delay = 1000): Promise<any> => {
+function repairJson(json: string): string {
+  let text = json.trim();
+  if (!text.startsWith('{') && !text.startsWith('[')) {
+    const firstBrace = text.indexOf('{');
+    const firstBracket = text.indexOf('[');
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      text = text.substring(firstBrace);
+    } else if (firstBracket !== -1) {
+      text = text.substring(firstBracket);
+    }
+  }
+  const quoteCount = (text.match(/"/g) || []).length;
+  if (quoteCount % 2 !== 0) {
+    text += '"';
+  }
+  const stack: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '{' || char === '[') {
+      stack.push(char === '{' ? '}' : ']');
+    } else if (char === '}' || char === ']') {
+      if (stack.length > 0 && stack[stack.length - 1] === char) {
+        stack.pop();
+      }
+    }
+  }
+  while (stack.length > 0) {
+    text += stack.pop();
+  }
+  return text;
+}
+
+const callWithRetry = async (params: GenerateContentParameters, retries = 5, delay = 2000): Promise<any> => {
   const ai = getAI();
   try {
     return await ai.models.generateContent(params);
   } catch (error: any) {
-    if (retries > 0 && (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED'))) {
-      console.warn(`Quota exceeded. Retrying in ${delay}ms... (${retries} retries left)`);
-      await wait(delay);
-      return callWithRetry(params, retries - 1, delay * 2);
+    const errorStr = typeof error.message === 'string' ? error.message : JSON.stringify(error);
+    const isRateLimit = errorStr.includes('429') || 
+                        errorStr.includes('RESOURCE_EXHAUSTED') || 
+                        errorStr.includes('quota');
+    const isServerBusy = errorStr.includes('503') || errorStr.includes('500') || errorStr.includes('busy');
+
+    if (retries > 0 && (isRateLimit || isServerBusy)) {
+      const actualDelay = isRateLimit ? delay * 2 : delay;
+      console.warn(`API Quota/Busy hit. Retrying in ${actualDelay}ms... (${retries} retries left)`);
+      await wait(actualDelay);
+      return callWithRetry(params, retries - 1, actualDelay * 1.5);
     }
     throw error;
   }
 };
 
 const GLOBAL_CONVENTION = `
-- Language: FR (source of truth)
-- Tone: Academic, clinical, neutral
-- Audience: MD / PhD / peer-reviewed journal
-- No meta commentary
-- No AI self-reference
+- Langue : FRANÇAIS (Impératif)
+- Ton : Académique, clinique, neutre
+- Audience : MD / PhD / Revue à comité de lecture
+- Aucun commentaire meta
+- Aucune référence à soi-même en tant qu'IA
+- Sortie : JSON valide uniquement sauf pour la rédaction de texte brut.
 `;
 
 export const AGENT_PROMPTS = {
-  SCOUT: (topic: string) => `You are a clinical research scout.
+  SCOUT: (topic: string) => `Vous êtes un éclaireur en recherche clinique.
 ${GLOBAL_CONVENTION}
-Task:
-Identify key peer-reviewed studies relevant to the following research question.
+Tâche : Identifier les études clés évaluées par les pairs pour : ${topic}
+Contraintes : MAX 6 études, prioriser phase I-II, humain uniquement.
+Sortie STRICTEMENT un tableau JSON d'objets : {id, title, authors, journal, year, pmid, studyType, population, outcome, limitation}.`,
 
-Constraints:
-- Output MAX 6 studies
-- Prioritize phase I–II clinical trials
-- Human studies only
-- Provide only high-impact information
-
-Research question:
-${topic}
-
-Output STRICTLY a JSON array of objects with fields: id (Ref-01...), title, authors, journal, year, pmid, studyType, population, outcome, limitation.`,
-
-  ANALYZER: (scoutOutput: string) => `You are a methodological evaluator.
+  ANALYZER: (scoutOutput: string) => `Vous êtes un évaluateur méthodologique.
 ${GLOBAL_CONVENTION}
-Input:
+Tâche : Évaluation GRADE pour ces études :
 ${scoutOutput}
+Format de sortie : Tableau JSON d'objets avec les champs : Ref-ID, Evidence (High/Moderate/Low/Very Low), Bias (Low/Moderate/High), Uncertainty (1 phrase).`,
 
-Task:
-Evaluate the certainty of evidence using GRADE principles.
-
-For each reference:
-- Evidence level: High / Moderate / Low / Very Low
-- Risk of bias: Low / Moderate / High
-- Main uncertainty factor (1 short sentence)
-
-Output format: JSON array of objects with Ref-ID, Evidence, Bias, Uncertainty.
-Do NOT repeat study descriptions. Do NOT add clinical interpretation.`,
-
-  WRITER: (title: string, objective: string, memory: string, refs: string, tokenTarget: number) => `You are a medical scientific writer.
+  WRITER: (title: string, objective: string, memory: string, refs: string, tokenTarget: number) => `Vous êtes un rédacteur scientifique médical.
 ${GLOBAL_CONVENTION}
-Section to write:
-${title}
+Section : ${title}
+Objectif : ${objective}
+Contexte : ${memory}
+Refs : ${refs}
+Règles : IMRAD, Français impeccable, Pas de meta-discours, Max ${tokenTarget} tokens. Sortie texte brut uniquement.`,
 
-Objective:
-${objective}
-
-Context summary (MAX 5 lines):
-${memory}
-
-References allowed:
-${refs}
-
-Writing rules:
-- IMRAD-compliant
-- Academic style
-- No introduction phrases
-- No conclusion phrases
-- Cite references as [Ref-01], not PMIDs
-- Do not exceed ${tokenTarget} tokens
-- Avoid redundancy with previous sections
-
-Write only the section body.`,
-
-  SUPERVISOR: (currentSection: string, previousSections: string) => `You are an academic supervisor.
+  SUPERVISOR: (currentSection: string, previousSections: string) => `Vous êtes un superviseur académique.
 ${GLOBAL_CONVENTION}
-Input:
-- Current section: ${currentSection}
-- Summary of previous sections: ${previousSections}
+Tâche : Fournir des directives éditoriales pour la section actuelle.
+Sortie STRICTEMENT JSON : {logicalAdjustments: [], redundanciesToRemove: [], missingAngles: [], suggestedFigureTitle: ""}.
+Section Actuelle : ${currentSection}`,
 
-Task:
-Provide editorial directives ONLY.
-
-Output STRICTLY JSON with:
-- logicalAdjustments (bullet points)
-- redundanciesToRemove (bullet points)
-- missingAngles (bullet points)
-- suggestedFigureTitle (string)
-
-Do NOT rewrite text. Do NOT add content. Do NOT exceed 120 tokens.`,
-
-  GUARD: (text: string) => `You are a scientific language auditor.
+  GUARD: (text: string) => `Vous êtes un auditeur linguistique scientifique.
 ${GLOBAL_CONVENTION}
-Task:
-Edit the text ONLY to:
-- Remove AI-pattern phrases
-- Normalize academic tone
-- Improve sentence flow without changing meaning
+Tâche : Nettoyer les patterns IA, fluidifier, maintenir la rigueur. Renvoyer la version nettoyée UNIQUEMENT.
+Texte : ${text}`,
 
-Strict rules:
-- Do NOT add new information
-- Do NOT remove references
-- Do NOT change structure
-- Do NOT mention AI
-
-Return the cleaned version only.
-Text: ${text}`,
-
-  FIGURE_PLANNER: (sectionText: string) => `You are a scientific figure planner.
+  FIGURE_PLANNER: (sectionText: string) => `Vous êtes un planificateur de figures scientifiques.
 ${GLOBAL_CONVENTION}
-Based on the following section:
-${sectionText}
+Basé sur : ${sectionText}
+Proposez 2 figures. Sortie tableau JSON : {id, title, type, variables, purpose}.`,
 
-Propose up to 2 figures.
-
-For each figure provide in a JSON array:
-- id
-- title
-- type (e.g. Kaplan-Meier, schematic, bar chart)
-- variables
-- purpose (1 line)
-
-Do NOT describe results. Do NOT invent data.`,
-
-  ANNEXES: (manuscriptText: string) => `You are generating supplementary material.
+  ANNEXES: (manuscriptText: string) => `Vous générez du matériel supplémentaire.
 ${GLOBAL_CONVENTION}
-Task:
-List annexes relevant to the manuscript.
+Lister les annexes. Sortie tableau JSON : {id, title, contentType, source}.`,
 
-For each annex in JSON array:
-- id
-- title
-- contentType (table, protocol, scale, dataset)
-- source (Ref-ID if applicable)
-
-Do NOT repeat manuscript text.
-Manuscript: ${manuscriptText}`,
-
-  BIBLIOGRAPHY: (refs: string) => `You are a reference compiler.
+  BIBLIOGRAPHY: (refs: string) => `Vous êtes un compilateur de références.
 ${GLOBAL_CONVENTION}
-Input:
-List of reference IDs with PMIDs or DOIs.
-${refs}
+Sortie bibliographie style Vancouver. Une par ligne.`,
 
-Output:
-- Vancouver style bibliography
-- Ordered by appearance
-- One reference per line
-
-Do NOT add explanations.`,
-
-  TRANSLATION: (text: string, lang: string) => `Translate the following scientific text into ${lang}.
-${GLOBAL_CONVENTION}
-Rules:
-- Preserve structure and references
-- Maintain academic tone
-- Do NOT summarize
-- Do NOT expand
-- Do NOT add explanations
-
-Text:
-${text}`
+  TRANSLATION: (text: string, lang: string) => `Traduire en ${lang}. Sortie texte brut uniquement.`
 };
 
-// Specialized Agent Callers
 export const scoutRetrieve = async (topic: string): Promise<ResearchPaper[]> => {
   const res = await callWithRetry({
     model: 'gemini-3-flash-preview',
     contents: AGENT_PROMPTS.SCOUT(topic),
     config: {
       tools: [{ googleSearch: {} }],
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            title: { type: Type.STRING },
-            authors: { type: Type.STRING },
-            journal: { type: Type.STRING },
-            year: { type: Type.STRING },
-            pmid: { type: Type.STRING },
-            studyType: { type: Type.STRING },
-            population: { type: Type.STRING },
-            outcome: { type: Type.STRING },
-            limitation: { type: Type.STRING }
-          }
-        }
-      }
+      responseMimeType: 'application/json'
     }
   });
-  return JSON.parse(res.text || "[]");
+  try {
+    return JSON.parse(repairJson(res.text || "[]"));
+  } catch (e) {
+    console.error("Erreur de parsing JSON dans SCOUT:", e, res.text);
+    return [];
+  }
 };
 
 export const analyzerGrade = async (papers: ResearchPaper[]): Promise<any[]> => {
@@ -214,7 +140,12 @@ export const analyzerGrade = async (papers: ResearchPaper[]): Promise<any[]> => 
     contents: AGENT_PROMPTS.ANALYZER(input),
     config: { responseMimeType: 'application/json' }
   });
-  return JSON.parse(res.text || "[]");
+  try {
+    return JSON.parse(repairJson(res.text || "[]"));
+  } catch (e) {
+    console.error("Erreur de parsing JSON dans ANALYZER:", e, res.text);
+    return [];
+  }
 };
 
 export const writerDraft = async (section: { title: string, objective: string }, memory: string, refs: string) => {
@@ -232,7 +163,12 @@ export const supervisorDirectives = async (current: string, previous: string) =>
     contents: AGENT_PROMPTS.SUPERVISOR(current, previous),
     config: { responseMimeType: 'application/json' }
   });
-  return JSON.parse(res.text || "{}");
+  try {
+    return JSON.parse(repairJson(res.text || "{}"));
+  } catch (e) {
+    console.error("Erreur de parsing JSON dans SUPERVISOR:", e, res.text);
+    return { logicalAdjustments: [], redundanciesToRemove: [], missingAngles: [] };
+  }
 };
 
 export const guardClean = async (text: string) => {

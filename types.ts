@@ -43,9 +43,8 @@ export enum AgentState {
   SCOPING = 'SCOPING',
   RETRIEVAL = 'RETRIEVAL',
   APPRAISAL = 'APPRAISAL',
-  SYNTHESIS = 'SYNTHESIS',
-  DESIGNING = 'DESIGNING',
   WRITING = 'WRITING',
+  SUPERVISION = 'SUPERVISION',
   INTEGRITY = 'INTEGRITY',
   COMPLETE = 'COMPLETE',
   ERROR = 'ERROR'
@@ -124,6 +123,7 @@ export interface FigureBlueprint {
   title: string;
   variables: string[];
   purpose: string;
+  description?: string;
 }
 
 export interface DetailedThesis {
@@ -131,7 +131,7 @@ export interface DetailedThesis {
   chapters: ThesisChapter[];
   metaPlan: string;
   figures: FigureBlueprint[];
-  annexes: { id: string; title: string; contentType: string; source: string }[];
+  annexes: { id: string; title: string; contentType: string; source: string; content?: string }[];
 }
 
 export interface AgentLog {

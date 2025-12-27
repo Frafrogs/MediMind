@@ -1,6 +1,7 @@
+
 import React, { useEffect, useRef, memo } from 'react';
 import { AgentLog } from '../types';
-import { Terminal, CheckCircle2, AlertCircle, BrainCircuit, Search, ShieldCheck, ChevronRight, UserCheck, Languages, UserMinus } from 'lucide-react';
+import { Terminal, CheckCircle2, AlertCircle, BrainCircuit, Search, ShieldCheck, ChevronRight, UserCheck } from 'lucide-react';
 
 interface LogStreamProps {
   logs: AgentLog[];
@@ -8,10 +9,14 @@ interface LogStreamProps {
 
 const LogStream: React.FC<LogStreamProps> = ({ logs }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [logs]);
 
@@ -30,11 +35,11 @@ const LogStream: React.FC<LogStreamProps> = ({ logs }) => {
 
   return (
     <div className="flex flex-col h-full bg-transparent font-mono">
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6 custom-scrollbar">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-8 py-6 space-y-6 custom-scrollbar">
         {logs.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-slate-800 opacity-20">
              <Terminal className="w-12 h-12 mb-4" />
-             <span className="text-[9px] font-black uppercase tracking-[0.5em]">Awaiting_Input</span>
+             <span className="text-[9px] font-black uppercase tracking-[0.5em]">En_Attente</span>
           </div>
         )}
         {logs.map((log) => (
@@ -59,7 +64,7 @@ const LogStream: React.FC<LogStreamProps> = ({ logs }) => {
             </div>
           </div>
         ))}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="h-1" />
       </div>
 
       <style>{`

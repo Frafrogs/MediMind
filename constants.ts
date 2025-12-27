@@ -6,49 +6,49 @@ export const STEPS = [
     id: 'SCOPING',
     label: 'Cadrage PRISMA',
     icon: Microscope,
-    description: 'Initialisation des protocoles de recherche.',
+    description: 'Initialisation des protocoles de recherche et critères d\'inclusion.',
     color: 'text-slate-400'
   },
   {
     id: 'RETRIEVAL',
-    label: 'Scout Retrieval',
+    label: 'Extraction Scout',
     icon: Search,
-    description: 'Extraction systématique de la littérature.',
+    description: 'Recherche systématique de la littérature scientifique.',
     color: 'text-sky-400'
   },
   {
     id: 'APPRAISAL',
-    label: 'GRADE Analysis',
+    label: 'Analyse GRADE',
     icon: ShieldCheck,
-    description: 'Évaluation de la certitude des preuves.',
+    description: 'Évaluation de la certitude des preuves cliniques.',
     color: 'text-rose-400'
   },
   {
     id: 'WRITING',
-    label: 'Micro-Sectioning',
+    label: 'Micro-Rédaction',
     icon: FileText,
-    description: 'Rédaction IMRAD haute-densité.',
+    description: 'Génération de contenu IMRAD haute-densité.',
     color: 'text-indigo-400'
   },
   {
     id: 'SUPERVISION',
-    label: 'PhD Supervision',
+    label: 'Supervision PhD',
     icon: UserCheck,
-    description: 'Ajustements logiques et éditoriaux.',
+    description: 'Ajustements logiques et éditoriaux avancés.',
     color: 'text-amber-400'
   },
   {
     id: 'INTEGRITY',
-    label: 'Integrity Guard',
+    label: 'Garde d\'Intégrité',
     icon: ShieldAlert,
-    description: 'Audit anti-IA et plagiat.',
+    description: 'Audit anti-hallucination et vérification des sources.',
     color: 'text-teal-400'
   },
   {
     id: 'COMPLETE',
     label: 'Certification',
     icon: BookOpen,
-    description: 'Compilation du manuscrit final.',
+    description: 'Compilation finale du manuscrit certifié.',
     color: 'text-emerald-400'
   }
 ];
