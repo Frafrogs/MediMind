@@ -1,0 +1,163 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediMind | Scientific Research Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Crimson+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Inter"', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+              serif: ['"Crimson Pro"', 'serif'],
+            },
+            colors: {
+              medical: {
+                50: '#f0fdfa',
+                100: '#ccfbf1',
+                200: '#99f6e4',
+                300: '#5eead4',
+                400: '#2dd4bf',
+                500: '#14b8a6',
+                600: '#0d9488',
+                700: '#0f766e',
+                800: '#115e59',
+                900: '#134e4a',
+                950: '#042f2e',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --a4-width: 210mm;
+        --a4-height: 297mm;
+        --page-padding: 25mm;
+      }
+      
+      body {
+        background-color: #020617;
+        color: #f8fafc;
+        margin: 0;
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+      /* A4 Professional Page Styles */
+      .a4-page {
+        width: var(--a4-width);
+        height: var(--a4-height);
+        padding: var(--page-padding);
+        background: white;
+        color: #000;
+        box-shadow: 0 0 40px rgba(0,0,0,0.15);
+        margin: 40px auto;
+        box-sizing: border-box;
+        overflow: hidden; /* CRITICAL */
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.3s ease;
+      }
+
+      .a4-content {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Crimson Pro", serif;
+        font-size: 11.5pt;
+        line-height: 1.5;
+        text-align: justify;
+      }
+
+      .a4-page:hover {
+        transform: scale(1.005);
+      }
+
+      .page-footer {
+        position: absolute;
+        bottom: 12mm;
+        left: var(--page-padding);
+        right: var(--page-padding);
+        border-top: 0.2pt solid #e2e8f0;
+        padding-top: 4mm;
+        font-family: "Inter", sans-serif;
+        font-size: 8pt;
+        color: #94a3b8;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .scan-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to bottom, transparent, rgba(20, 184, 166, 0.02), transparent);
+        pointer-events: none;
+        z-index: 100;
+        animation: scan 10s linear infinite;
+      }
+
+      @keyframes scan {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(100vh); }
+      }
+
+      @media print {
+        @page {
+          size: A4;
+          margin: 0;
+        }
+        body {
+          background: white !important;
+        }
+        .a4-page {
+          margin: 0 !important;
+          box-shadow: none !important;
+          page-break-after: always;
+          transform: none !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@1.33.0",
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "lucide-react": "https://esm.sh/lucide-react@0.475.0?external=react,react-dom",
+    "react-markdown": "https://esm.sh/react-markdown@9.0.3?external=react,react-dom",
+    "three": "https://esm.sh/three@0.174.0",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.17.14?external=three,react,react-dom",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@9.121.4?external=@react-three/fiber,three,react,react-dom",
+    "gsap": "https://esm.sh/gsap@3.12.5",
+    "gsap/ScrollTrigger": "https://esm.sh/gsap@3.12.5/ScrollTrigger",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "gsap/": "https://esm.sh/gsap@^3.14.2/"
+  }
+}
+</script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
