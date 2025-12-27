@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
+    minify: 'esbuild', // Plus rapide que terser et intégré par défaut
     sourcemap: false,
-    minify: 'terser',
     rollupOptions: {
       output: {
         manualChunks: {

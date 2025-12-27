@@ -1,25 +1,29 @@
 
 import { GoogleGenAI, Type, GenerateContentParameters } from "@google/genai";
-import { ResearchPaper, SynthesisResult, ScientificArticle, ResearchMode } from "../types";
+import { ResearchPaper } from "../types";
 
 /**
- * ARCHITECTURE SÉCURISÉE : 
- * La clé API est récupérée exclusivement via process.env.API_KEY.
- * Pour une mise en production (SaaS Médical), cet appel devrait être proxifié 
- * par un Cloudflare Worker pour éviter toute exposition client.
+ * INITIALISATION SÉCURISÉE DU SDK
+ * Utilise exclusivement process.env.API_KEY injecté par l'environnement.
  */
 const getAI = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("Clé API MediMind manquante. Vérifiez la configuration de l'environnement.");
+    throw new Error("Clé API MediMind manquante. Vérifiez votre environnement.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Utilitaire de réparation JSON pour gérer les réponses verbeuses des modèles.
+ */
 function repairJson(json: string): string {
   let text = json.trim();
+  // Suppression des blocs de code markdown si présents
+  text = text.replace(/```json\n?/, '').replace(/\n?```/, '');
+  
   if (!text.startsWith('{') && !text.startsWith('[')) {
     const firstBrace = text.indexOf('{');
     const firstBracket = text.indexOf('[');
@@ -32,15 +36,21 @@ function repairJson(json: string): string {
   return text;
 }
 
+/**
+ * Wrapper avec retry exponentiel pour la résilience SaaS.
+ */
 const callWithRetry = async (params: GenerateContentParameters, retries = 3, delay = 2000): Promise<any> => {
   const ai = getAI();
   try {
-    return await ai.models.generateContent(params);
+    const response = await ai.models.generateContent(params);
+    if (!response) throw new Error("Réponse vide du modèle.");
+    return response;
   } catch (error: any) {
     const errorStr = error.message || JSON.stringify(error);
-    const isRateLimit = errorStr.includes('429') || errorStr.includes('quota');
+    const isRateLimit = errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED');
     
     if (retries > 0 && isRateLimit) {
+      console.warn(`Quota atteint. Nouvelle tentative dans ${delay}ms...`);
       await wait(delay);
       return callWithRetry(params, retries - 1, delay * 2);
     }
