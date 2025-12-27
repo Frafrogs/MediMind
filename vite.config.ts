@@ -6,12 +6,13 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
-    minify: 'esbuild', // Plus rapide que terser et intégré par défaut
+    minify: 'esbuild', // Plus rapide et sécurisé pour les environnements serverless
     sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'three', 'gsap'],
+          vendor: ['react', 'react-dom', 'gsap'],
+          three: ['three', '@react-three/fiber', '@react-three/drei'],
           genai: ['@google/genai']
         }
       }

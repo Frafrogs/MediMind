@@ -1,29 +1,25 @@
 
-import { GoogleGenAI, Type, GenerateContentParameters } from "@google/genai";
+import { GoogleGenAI, GenerateContentParameters } from "@google/genai";
 import { ResearchPaper } from "../types";
 
 /**
  * INITIALISATION SÉCURISÉE DU SDK
- * Utilise exclusivement process.env.API_KEY injecté par l'environnement.
+ * Utilise exclusivement process.env.API_KEY. 
+ * En production SaaS, cet appel est intercepté par le proxy Cloudflare/Vite.
  */
 const getAI = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("Clé API MediMind manquante. Vérifiez votre environnement.");
+    throw new Error("MediMind_Critical_Error: API_KEY_NOT_FOUND. Vérifiez la configuration de l'environnement.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Utilitaire de réparation JSON pour gérer les réponses verbeuses des modèles.
- */
 function repairJson(json: string): string {
   let text = json.trim();
-  // Suppression des blocs de code markdown si présents
   text = text.replace(/```json\n?/, '').replace(/\n?```/, '');
-  
   if (!text.startsWith('{') && !text.startsWith('[')) {
     const firstBrace = text.indexOf('{');
     const firstBracket = text.indexOf('[');
@@ -36,21 +32,15 @@ function repairJson(json: string): string {
   return text;
 }
 
-/**
- * Wrapper avec retry exponentiel pour la résilience SaaS.
- */
 const callWithRetry = async (params: GenerateContentParameters, retries = 3, delay = 2000): Promise<any> => {
   const ai = getAI();
   try {
     const response = await ai.models.generateContent(params);
-    if (!response) throw new Error("Réponse vide du modèle.");
+    if (!response) throw new Error("Réponse_Nulle");
     return response;
   } catch (error: any) {
-    const errorStr = error.message || JSON.stringify(error);
-    const isRateLimit = errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED');
-    
-    if (retries > 0 && isRateLimit) {
-      console.warn(`Quota atteint. Nouvelle tentative dans ${delay}ms...`);
+    const errorStr = error.message || "";
+    if (retries > 0 && (errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('exhausted'))) {
       await wait(delay);
       return callWithRetry(params, retries - 1, delay * 2);
     }
@@ -59,58 +49,51 @@ const callWithRetry = async (params: GenerateContentParameters, retries = 3, del
 };
 
 const GLOBAL_CONVENTION = `
-- Langue : FRANÇAIS (Impératif)
-- Ton : Académique, clinique, neutre
-- Audience : MD / PhD / Revue à comité de lecture
-- Sortie : JSON valide uniquement sauf pour la rédaction de texte brut.
+- Langue : FRANÇAIS
+- Ton : Scientifique de haut niveau
+- Sortie : JSON STRICT sans texte superflu
 `;
 
 export const AGENT_PROMPTS = {
-  SCOUT: (topic: string) => `Vous êtes un éclaireur en recherche clinique.
+  SCOUT: (topic: string) => `Rôle: Éclaireur Clinique.
 ${GLOBAL_CONVENTION}
-Tâche : Identifier 6 études clés (PubMed/NIH) pour : ${topic}
-Sortie : JSON tableau d'objets {id, title, authors, journal, year, pmid, studyType, population, outcome, limitation}.`,
+Tâche: Extraire 6 études pivots PubMed pour: ${topic}.
+JSON: {id, title, authors, journal, year, pmid, studyType, population, outcome, riskOfBias}.`,
 
-  ANALYZER: (scoutOutput: string) => `Évaluateur GRADE.
+  ANALYZER: (input: string) => `Rôle: Évaluateur GRADE.
 ${GLOBAL_CONVENTION}
-Analyse de certitude : ${scoutOutput}
-Sortie : JSON tableau {Ref-ID, Evidence, Bias, Uncertainty}.`,
+Input: ${input}
+JSON: [{refId, evidenceLevel, biasAssessment, clinicalImpact}].`,
 
-  WRITER: (title: string, objective: string, memory: string, refs: string, tokenTarget: number) => `Rédacteur Médical.
-${GLOBAL_CONVENTION}
-Section : ${title} | Objectif : ${objective}
-Contexte Structural : ${memory}
+  WRITER: (title: string, obj: string, mem: string, refs: string) => `Rôle: Rédacteur Médical.
+Texte : ${title} | Objectif : ${obj}
+Blueprint : ${mem}
 Citations : ${refs}
-Règles : IMRAD, Français impeccable. Texte brut uniquement.`,
+Règle : Français académique uniquement. Pas de JSON.`,
 
-  SUPERVISOR: (currentSection: string) => `Superviseur PhD.
+  SUPERVISOR: (text: string) => `Rôle: Superviseur PhD.
 ${GLOBAL_CONVENTION}
-Audit de la section. Sortie JSON : {logicalAdjustments: [], redundanciesToRemove: [], missingAngles: [], suggestedFigureTitle: ""}.
-Texte : ${currentSection}`,
+Vérifier cohérence et rigueur.
+JSON: {logicalAdjustments: [], missingData: []}.`,
 
-  GUARD: (text: string) => `Auditeur d'Intégrité.
-${GLOBAL_CONVENTION}
-Éliminer les patterns IA, renforcer la rigueur. Version nettoyée UNIQUEMENT.
-Texte : ${text}`,
+  GUARD: (text: string) => `Rôle: Audit Intégrité.
+Nettoyer patterns IA. Sortie texte brut uniquement.
+Contenu : ${text}`,
 
-  FIGURE_PLANNER: (sectionText: string) => `Planificateur de Figures.
+  FIGURE_PLANNER: (text: string) => `Rôle: Data Visualizer.
 ${GLOBAL_CONVENTION}
-Proposez 2 figures pour : ${sectionText.substring(0, 1000)}
-Sortie : JSON tableau {id, title, type, variables, purpose, description}.`,
+JSON: [{id, title, type, variables, purpose}].`,
 
-  ANNEXES: (manuscriptText: string) => `Matériel supplémentaire.
+  ANNEXES: (text: string) => `Rôle: Technical Writer.
 ${GLOBAL_CONVENTION}
-Sortie : JSON tableau {id, title, contentType, source, content}.`
+JSON: [{id, title, contentType, content}].`
 };
 
 export const scoutRetrieve = async (topic: string): Promise<ResearchPaper[]> => {
   const res = await callWithRetry({
     model: 'gemini-3-flash-preview',
     contents: AGENT_PROMPTS.SCOUT(topic),
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: 'application/json'
-    }
+    config: { tools: [{ googleSearch: {} }], responseMimeType: 'application/json' }
   });
   return JSON.parse(repairJson(res.text || "[]"));
 };
@@ -128,7 +111,7 @@ export const analyzerGrade = async (papers: ResearchPaper[]): Promise<any[]> => 
 export const writerDraft = async (section: { title: string, objective: string }, memory: string, refs: string) => {
   const res = await callWithRetry({
     model: 'gemini-3-pro-preview',
-    contents: AGENT_PROMPTS.WRITER(section.title, section.objective, memory, refs, 500),
+    contents: AGENT_PROMPTS.WRITER(section.title, section.objective, memory, refs),
     config: { thinkingConfig: { thinkingBudget: 4096 } }
   });
   return res.text || "";
@@ -144,9 +127,6 @@ export const supervisorDirectives = async (current: string) => {
 };
 
 export const guardClean = async (text: string) => {
-  const res = await callWithRetry({
-    model: 'gemini-3-flash-preview',
-    contents: AGENT_PROMPTS.GUARD(text),
-  });
+  const res = await callWithRetry({ model: 'gemini-3-flash-preview', contents: AGENT_PROMPTS.GUARD(text) });
   return res.text || text;
 };
