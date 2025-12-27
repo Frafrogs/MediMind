@@ -17,7 +17,9 @@
     "three": "0.174.0",
     "@react-three/fiber": "8.17.14",
     "@react-three/drei": "9.121.4",
-    "gsap": "^3.14.2"
+    "gsap": "^3.14.2",
+    "@vitejs/plugin-react": "^5.1.2",
+    "vite": "^7.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

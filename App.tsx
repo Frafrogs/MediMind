@@ -101,7 +101,8 @@ const App: React.FC = () => {
   const activeStepIndex = useMemo(() => {
     if (state === AgentState.IDLE) return -1;
     if (state === AgentState.COMPLETE) return STEPS.length - 1;
-    return STEPS.findIndex(s => s.id === state);
+    const idx = STEPS.findIndex(s => s.id === state);
+    return idx === -1 ? 0 : idx;
   }, [state]);
 
   const isIdle = state === AgentState.IDLE || state === AgentState.COMPLETE;
@@ -186,7 +187,7 @@ const App: React.FC = () => {
             className={`px-8 py-2.5 rounded-xl font-black text-[11px] tracking-widest flex items-center gap-3 transition-all transform active:scale-95 disabled:opacity-30 shadow-2xl shrink-0 ${(!isIdle && state !== AgentState.ERROR) ? 'bg-white text-slate-950' : 'bg-medical-500/10 text-medical-400 border border-medical-500/30 hover:bg-medical-500/20'}`}
           >
             {(!isIdle && state !== AgentState.ERROR) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
-            {isIdle || state === AgentState.ERROR ? 'LANCER' : 'PROCESSING'}
+            {isIdle || state === AgentState.ERROR ? 'LANCER' : 'TRAITEMENT'}
           </button>
         </div>
         

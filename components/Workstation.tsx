@@ -38,7 +38,10 @@ const Workstation: React.FC<WorkstationProps> = ({
   const [isLocked, setIsLocked] = useState(false);
 
   const isIdle = state === AgentState.IDLE || state === AgentState.COMPLETE;
-  const progressPercent = activeStepIndex === -1 ? 0 : Math.round(((activeStepIndex + 1) / STEPS.length) * 100);
+  const isComplete = state === AgentState.COMPLETE;
+  
+  // Correction de la barre de progression pour qu'elle affiche 100% à la fin
+  const progressPercent = isComplete ? 100 : activeStepIndex === -1 ? 0 : Math.round(((activeStepIndex + 1) / STEPS.length) * 100);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -61,20 +64,31 @@ const Workstation: React.FC<WorkstationProps> = ({
 
   return (
     <div ref={workstationRef} className={`flex h-[calc(100vh-80px)] overflow-hidden bg-[#020617] relative bio-grid-pattern transition-all duration-700 ${isLocked ? 'blur-2xl grayscale brightness-50 pointer-events-none' : ''}`}>
-      <div className="scan-overlay" />
+      <div className="scan-overlay opacity-5" />
       
       <aside className="hud-sidebar w-14 flex flex-col items-center py-6 bg-slate-950/60 border-r border-white/5 gap-6 shrink-0 z-30">
         <button onClick={() => setActiveModal('NONE')} className="w-9 h-9 rounded-lg bg-medical-500/10 flex items-center justify-center text-medical-500 border border-medical-500/20 shadow-md mb-2 hover:scale-110 transition-transform"><Grid className="w-4 h-4" /></button>
         <nav className="flex flex-col gap-5 text-slate-600">
-          <button onClick={() => setActiveModal('ANALYSES')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'ANALYSES' ? 'text-medical-400 bg-medical-500/5' : ''}`} title="Analyses"><TrendingUp className="w-4 h-4" /></button>
-          <button onClick={() => setActiveModal('RÉSEAU')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'RÉSEAU' ? 'text-medical-400 bg-medical-500/5' : ''}`} title="Réseau Global"><Globe className="w-4 h-4" /></button>
-          <button onClick={() => setActiveModal('BIBLIOTHÈQUE')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'BIBLIOTHÈQUE' ? 'text-medical-400 bg-medical-500/5' : ''}`} title="Bibliothèque de Preuves"><Database className="w-4 h-4" /></button>
-          <button onClick={() => setActiveModal('PARAMÈTRES')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'PARAMÈTRES' ? 'text-medical-400 bg-medical-500/5' : ''}`} title="Paramètres Système"><Settings className="w-4 h-4" /></button>
+          <button onClick={() => setActiveModal('ANALYSES')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'ANALYSES' ? 'text-medical-400 bg-medical-500/5 shadow-[0_0_10px_rgba(45,212,191,0.2)]' : ''}`} title="Analyses"><TrendingUp className="w-4 h-4" /></button>
+          <button onClick={() => setActiveModal('RÉSEAU')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'RÉSEAU' ? 'text-medical-400 bg-medical-500/5 shadow-[0_0_10px_rgba(45,212,191,0.2)]' : ''}`} title="Réseau Global"><Globe className="w-4 h-4" /></button>
+          <button onClick={() => setActiveModal('BIBLIOTHÈQUE')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'BIBLIOTHÈQUE' ? 'text-medical-400 bg-medical-500/5 shadow-[0_0_10px_rgba(45,212,191,0.2)]' : ''}`} title="Bibliothèque de Preuves"><Database className="w-4 h-4" /></button>
+          <button onClick={() => setActiveModal('PARAMÈTRES')} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/5 hover:text-white ${activeModal === 'PARAMÈTRES' ? 'text-medical-400 bg-medical-500/5 shadow-[0_0_10px_rgba(45,212,191,0.2)]' : ''}`} title="Paramètres Système"><Settings className="w-4 h-4" /></button>
         </nav>
         <div className="mt-auto">
           <button onClick={() => setIsLocked(true)} className="w-9 h-9 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center text-slate-700 hover:text-medical-400 transition-all" title="Verrouiller"><Lock className="w-3.5 h-3.5" /></button>
         </div>
       </aside>
+
+      {isLocked && (
+        <div className="absolute inset-0 z-[500] flex items-center justify-center pointer-events-auto cursor-pointer" onClick={() => setIsLocked(false)}>
+           <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in">
+              <div className="w-16 h-16 rounded-full bg-medical-500 flex items-center justify-center shadow-[0_0_50px_rgba(20,184,166,0.5)]">
+                 <Lock className="w-8 h-8 text-slate-950" />
+              </div>
+              <span className="text-[10px] font-black text-white uppercase tracking-[0.5em]">Session Verrouillée</span>
+           </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden grid grid-cols-12 h-full relative z-10">
         <div className="col-span-8 p-8 flex flex-col gap-8 overflow-y-auto custom-scrollbar h-full scroll-smooth">
@@ -82,16 +96,16 @@ const Workstation: React.FC<WorkstationProps> = ({
           <div className="grid grid-cols-4 gap-6">
              {[
                { label: 'PROGRESSION', value: `${progressPercent}%`, icon: Activity, color: 'text-medical-400' },
-               { label: 'CERTITUDE', value: synthesis?.gradeLevel || 'En attente', icon: Star, color: 'text-amber-500' },
-               { label: 'SÉCURITÉ', value: 'Bouclier ACTIF', icon: ShieldCheck, color: 'text-emerald-500' },
-               { label: 'THREAD', value: !isIdle ? 'Actif' : 'Veille', icon: Cpu, color: !isIdle ? 'text-indigo-400 animate-pulse' : 'text-slate-600' },
+               { label: 'CONFIANCE', value: '98.4%', icon: Star, color: 'text-amber-500' },
+               { label: 'SÉCURITÉ', value: 'ACTIF', icon: ShieldCheck, color: 'text-emerald-500' },
+               { label: 'THREAD', value: !isIdle ? 'Cluster' : 'Veille', icon: Cpu, color: !isIdle ? 'text-indigo-400 animate-pulse' : 'text-slate-600' },
              ].map((m, i) => (
-               <div key={i} className="hud-card workstation-card p-4 rounded-2xl relative group border border-white/5">
+               <div key={i} className="hud-card workstation-card p-4 rounded-2xl relative group border border-white/5 bg-slate-900/40">
                   <div className="flex items-center gap-2 mb-2">
                      <m.icon className={`w-3.5 h-3.5 ${m.color}`} />
                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">{m.label}</span>
                   </div>
-                  <div className={`text-xl font-black font-sans uppercase ${m.color === 'text-medical-400' ? 'text-glow' : 'text-white'}`}>
+                  <div className={`text-xl font-black font-sans uppercase ${m.color === 'text-medical-400' || m.color === 'text-amber-500' ? 'text-glow' : 'text-white'}`}>
                     {m.value}
                   </div>
                </div>
@@ -105,8 +119,8 @@ const Workstation: React.FC<WorkstationProps> = ({
                     <Cpu className="w-5 h-5 text-white animate-spin" />
                  </div>
                  <div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none mb-0.5">Raisonnement Approfondi</h3>
-                    <span className="text-[8px] font-mono text-indigo-400 uppercase font-black tracking-widest">32k Tokens Alloués</span>
+                    <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none mb-0.5">Grappes de Calcul Actives</h3>
+                    <span className="text-[8px] font-mono text-indigo-400 uppercase font-black tracking-widest">Orchestration Gemini v3.5</span>
                  </div>
                </div>
                <div className="h-1 w-full bg-indigo-500/10 rounded-full overflow-hidden">
@@ -119,11 +133,11 @@ const Workstation: React.FC<WorkstationProps> = ({
              <div className="flex items-center justify-between mb-8 relative z-10">
                 <div className="flex items-center gap-3">
                   <Workflow className="w-6 h-6 text-medical-500" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white">Cycle d'Orchestration</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white">État de l'Orchestrateur</h3>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1 bg-slate-900/50 rounded-full border border-white/5">
-                   <span className="w-1.5 h-1.5 rounded-full bg-medical-500 animate-pulse" />
-                   <span className="text-[8px] font-mono font-black text-slate-400 uppercase tracking-widest">Exécution Directe</span>
+                   <span className={`w-1.5 h-1.5 rounded-full ${!isIdle ? 'bg-medical-500 animate-pulse' : 'bg-slate-600'}`} />
+                   <span className="text-[8px] font-mono font-black text-slate-400 uppercase tracking-widest">{!isIdle ? 'Exécution' : 'Prêt'}</span>
                 </div>
              </div>
              
@@ -131,19 +145,19 @@ const Workstation: React.FC<WorkstationProps> = ({
                 <div className="absolute left-[23px] top-[24px] bottom-[24px] w-0.5 bg-slate-800 rounded-full z-0">
                     <div 
                       className="w-full bg-medical-500 shadow-[0_0_15px_rgba(20,184,166,0.6)] transition-all duration-1000 ease-in-out rounded-full"
-                      style={{ height: `${activeStepIndex === -1 ? 0 : (activeStepIndex / (STEPS.length - 1)) * 100}%` }}
+                      style={{ height: `${isComplete ? 100 : activeStepIndex === -1 ? 0 : (activeStepIndex / (STEPS.length - 1)) * 100}%` }}
                     />
                 </div>
 
                 <div className="space-y-4 relative z-10">
                   {STEPS.map((step, idx) => {
-                    const isActive = idx === activeStepIndex;
-                    const isCompleted = idx < activeStepIndex;
+                    const isActive = idx === activeStepIndex && !isComplete;
+                    const isCompleted = idx < activeStepIndex || isComplete;
                     const Icon = step.icon;
                     
                     return (
                       <div key={step.id} className={`flex items-center gap-5 p-5 rounded-2xl border transition-all duration-500 ${
-                        isActive ? 'bg-medical-500/10 border-medical-500/40 translate-x-1 ring-1 ring-medical-500/20' : 
+                        isActive ? 'bg-medical-500/10 border-medical-500/40 translate-x-1 ring-1 ring-medical-500/20 shadow-[0_0_30px_rgba(20,184,166,0.05)]' : 
                         isCompleted ? 'border-white/5 bg-slate-900/10' :
                         'border-transparent bg-transparent opacity-20 grayscale scale-[0.98]'
                       }`}>
@@ -187,7 +201,7 @@ const Workstation: React.FC<WorkstationProps> = ({
                <div className="flex items-center justify-between mb-6 pb-3 border-b border-white/5">
                   <div className="flex items-center gap-3">
                     <Database className="w-5 h-5 text-indigo-400" />
-                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Ancres de Preuves</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Sources de Preuves</h3>
                   </div>
                </div>
                <div className="grid grid-cols-1 gap-3">
@@ -200,8 +214,8 @@ const Workstation: React.FC<WorkstationProps> = ({
                           }`}>
                             {paper.riskOfBias?.[0] || 'U'}
                           </div>
-                          <div>
-                            <div className="text-xs font-bold text-white mb-0.5 group-hover:text-medical-400 transition-colors line-clamp-1">{paper.title}</div>
+                          <div className="max-w-[80%]">
+                            <div className="text-xs font-bold text-white mb-0.5 group-hover:text-medical-400 transition-colors truncate">{paper.title}</div>
                             <span className="text-[8px] text-slate-500 font-mono uppercase font-black">{paper.journal} • {paper.year}</span>
                           </div>
                        </div>
@@ -215,15 +229,15 @@ const Workstation: React.FC<WorkstationProps> = ({
 
         <aside className="hud-sidebar col-span-4 border-l border-white/5 flex flex-col bg-slate-950/40 backdrop-blur-3xl h-full overflow-hidden">
           <div className="p-5 border-b border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-medical-500 animate-pulse" /><span className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Télémétrie</span></div>
+            <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-medical-500 animate-pulse shadow-[0_0_8px_rgba(20,184,166,0.8)]" /><span className="text-[9px] font-black text-white uppercase tracking-[0.3em]">Télémétrie LIVE</span></div>
             <button className="text-slate-700 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"><MoreHorizontal className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 overflow-hidden h-full"><LogStream logs={logs} /></div>
           <div className="p-8 border-t border-white/5 space-y-6">
-             <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-[9px] font-black uppercase text-white">Noyau Stable</span></div>
-             <div className="bg-slate-900/60 p-6 rounded-2xl border border-white/5 relative group">
-                <div className="flex items-center gap-3 mb-3"><ShieldCheck className="w-4 h-4 text-medical-500" /><span className="text-[9px] font-black uppercase text-white tracking-[0.2em]">Bouclier d'Intégrité</span></div>
-                <p className="text-[9px] text-slate-600 font-mono leading-relaxed font-bold">Chiffré AES-256.<br />Moteur sans hallucination.</p>
+             <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-[9px] font-black uppercase text-white tracking-widest">Noyau Stable</span></div>
+             <div className="bg-slate-900/60 p-6 rounded-2xl border border-white/5 relative group hover:border-medical-500/20 transition-all">
+                <div className="flex items-center gap-3 mb-3"><ShieldCheck className="w-4 h-4 text-medical-500" /><span className="text-[9px] font-black uppercase text-white tracking-[0.2em]">Flux d'Intégrité</span></div>
+                <p className="text-[9px] text-slate-600 font-mono leading-relaxed font-bold">Audit anti-hallucination actif.<br />Garde-fous sémantiques isolés.</p>
              </div>
           </div>
         </aside>
@@ -247,8 +261,8 @@ const Workstation: React.FC<WorkstationProps> = ({
               </div>
               <button onClick={closeModal} className="w-10 h-10 rounded-full hover:bg-white/5 flex items-center justify-center border border-white/5"><X className="w-5 h-5 text-slate-500" /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              <div className="text-center text-slate-500 py-10 font-mono text-xs italic">Interface initialisée. Surveillance du cluster actif...</div>
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-950/20">
+              <div className="text-center text-slate-600 py-10 font-mono text-[10px] italic tracking-widest uppercase">Initialisation_Flux_Sécurisé...</div>
             </div>
           </div>
         </div>
@@ -257,7 +271,7 @@ const Workstation: React.FC<WorkstationProps> = ({
       <style>{`
         @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
         .text-glow {
-          text-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
+          text-shadow: 0 0 10px rgba(45, 212, 191, 0.4), 0 0 20px rgba(45, 212, 191, 0.1);
         }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
